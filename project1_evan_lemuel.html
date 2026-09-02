@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width,initial-scale=1">
+	<title>Student Grade Management System</title>
+	<style>
+		:root{font-family:Segoe UI,Roboto,Arial,sans-serif;--bg:#f6f8fa;--card:#ffffff;--muted:#6b7280;--accent:#0b5cff}
+		body{margin:0;background:var(--bg);color:#111}
+		.wrap{max-width:1000px;margin:32px auto;padding:20px}
+		h1{margin:0 0 12px;font-size:20px}
+		.card{background:var(--card);padding:16px;border-radius:8px;box-shadow:0 1px 3px rgba(16,24,40,.05);margin-bottom:16px}
+		form .row{display:flex;gap:12px;flex-wrap:wrap}
+		label{font-size:13px;color:var(--muted)}
+		input[type=text], input[type=number], select{padding:8px;border-radius:6px;border:1px solid #d1d5db;min-width:0}
+		input[type=number]{width:110px}
+		.actions{display:flex;gap:8px;align-items:center;margin-top:8px}
+		button{background:var(--accent);color:#fff;border:none;padding:8px 12px;border-radius:6px;cursor:pointer}
+		button.secondary{background:#6b7280}
+		table{width:100%;border-collapse:collapse;margin-top:12px}
+		th,td{padding:8px;border-bottom:1px solid #e6e8eb;text-align:left;font-size:14px}
+		th{background:#fbfdff;font-weight:600}
+		.muted{color:var(--muted);font-size:13px}
+		.controls{display:flex;gap:12px;align-items:center}
+		.summary{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px}
+		.summary .stat{background:#f3f4f6;padding:8px;border-radius:6px;min-width:140px}
+		.error{color:#b91c1c;font-size:13px}
+		@media(max-width:720px){.row{flex-direction:column}input[type=number]{width:100%}}
+	</style>
+</head>
+<body>
+	<div class="wrap">
+		<h1>Student Grade Management System</h1>
+
+		<div class="card">
+			<form id="studentForm">
+				<div class="row">
+					<div style="flex:2;min-width:180px">
+						<label for="name">Student Name</label><br>
+						<input type="text" id="name" placeholder="Full name" required>
+					</div>
+					<div>
+						<label for="math">Math</label><br>
+						<input type="number" id="math" min="0" max="100" value="0">
+					</div>
+					<div>
+						<label for="science">Science</label><br>
+						<input type="number" id="science" min="0" max="100" value="0">
+					</div>
+					<div>
+						<label for="english">English</label><br>
+						<input type="number" id="english" min="0" max="100" value="0">
+					</div>
+					<div>
+						<label for="history">History</label><br>
+						<input type="number" id="history" min="0" max="100" value="0">
+					</div>
+				</div>
+
+				<div class="actions">
+					<button type="submit">Add Student</button>
+					<button type="button" id="clearBtn" class="secondary">Clear Form</button>
+					<div id="formError" class="error" role="status" aria-live="polite"></div>
+				</div>
+			</form>
+		</div>
+
+		<div class="card">
+			<div class="controls">
+				<div>
+					<label for="gradeFilter">Filter Grade</label><br>
+					<select id="gradeFilter">
+						<option value="ALL">All</option>
+						<option value="A">A</option>
+						<option value="B">B</option>
+						<option value="C">C</option>
+						<option value="D">D</option>
+						<option value="F">F</option>
+					</select>
+				</div>
+				<div>
+					<label for="minAverage">Min Average (%)</label><br>
+					<input type="number" id="minAverage" min="0" max="100" placeholder="0">
+				</div>
+				<div style="margin-top:22px">
+					<button id="applyFilter" class="secondary">Apply Filter</button>
+					<button id="resetFilter" class="secondary">Reset</button>
+				</div>
+				<div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+					<button id="exportJson" title="Export current data as JSON">Export JSON</button>
+					<button id="clearAll" class="secondary">Clear All Students</button>
+				</div>
+			</div>
+
+			<div id="tableWrap">
+				<table id="studentsTable">
+					<thead>
+						<tr>
+							<th>Name</th>
+							<th>Math</th>
+							<th>Science</th>
+							<th>English</th>
+							<th>History</th>
+							<th>Total</th>
+							<th>Average (%)</th>
+							<th>Grade</th>
+							<th>Action</th>
+						</tr>
+					</thead>
+					<tbody></tbody>
+				</table>
+			</div>
+
+			<div class="summary" id="summaryStats">
+				<div class="stat"><strong>Total Students</strong><div id="totalStudents" class="muted">0</div></div>
+				<div class="stat"><strong>Class Average (%)</strong><div id="classAverage" class="muted">0</div></div>
+				<div class="stat"><strong>Highest Score</strong><div id="highestScore" class="muted">0</div></div>
+				<div class="stat"><strong>Lowest Score</strong><div id="lowestScore" class="muted">0</div></div>
+			</div>
+		</div>
+
+		<div class="muted"> </div>
+	</div>
+
+	<script>
+		let students = [];
+
+		const $ = id => document.getElementById(id);
+
+		const form = $('studentForm');
+		const nameInput = $('name');
+		const mathInput = $('math');
+		const scienceInput = $('science');
+		const englishInput = $('english');
+		const historyInput = $('history');
+		const formError = $('formError');
+		const tbody = document.querySelector('#studentsTable tbody');
+
+		const gradeFilter = $('gradeFilter');
+		const minAverage = $('minAverage');
+		const applyFilter = $('applyFilter');
+		const resetFilter = $('resetFilter');
+
+		const exportJsonBtn = $('exportJson');
+		const clearAllBtn = $('clearAll');
+		const clearBtn = $('clearBtn');
+
+		const totalStudentsNode = $('totalStudents');
+		const classAverageNode = $('classAverage');
+		const highestScoreNode = $('highestScore');
+		const lowestScoreNode = $('lowestScore');
+
+		(function init(){
+			try{
+				const raw = localStorage.getItem('students_data');
+				if(raw){
+					students = JSON.parse(raw);
+				}
+			}catch(err){
+				console.error('Failed to load saved students', err);
+				students = [];
+			}
+			renderTable();
+			updateSummary();
+		})();
+
+		function validateInput(name, scores){
+			if(!name || !name.trim()) throw new Error('Name is required');
+			scores.forEach(s => {
+				if(Number.isNaN(s) || s < 0 || s > 100) throw new Error('Scores must be numbers between 0 and 100');
+			});
+		}
+
+		function calculateGrade(avg){
+			if(avg >= 90) return 'A';
+			if(avg >= 80) return 'B';
+			if(avg >= 70) return 'C';
+			if(avg >= 60) return 'D';
+			return 'F';
+		}
+
+		function saveStudents(){
+			try{
+				localStorage.setItem('students_data', JSON.stringify(students));
+			}catch(err){
+				console.error('Failed to save students', err);
+			}
+		}
+
+		form.addEventListener('submit', function(e){
+			e.preventDefault();
+			formError.textContent = '';
+			try{
+				const name = nameInput.value.trim();
+				const math = Number(mathInput.value);
+				const science = Number(scienceInput.value);
+				const english = Number(englishInput.value);
+				const history = Number(historyInput.value);
+
+				validateInput(name,[math,science,english,history]);
+
+				const existing = students.find(s => s.name.toLowerCase() === name.toLowerCase());
+				if(existing){
+					throw new Error('A student with this name already exists');
+				}
+
+				const total = math + science + english + history;
+				const average = parseFloat((total / 4).toFixed(2));
+				const grade = calculateGrade(average);
+
+				const student = { id: Date.now(), name, math, science, english, history, total, average, grade };
+
+				students.push(student);
+				saveStudents();
+				renderTable();
+				updateSummary();
+				form.reset();
+			}catch(err){
+				formError.textContent = err.message || 'Failed to add student';
+			}
+		});
+
+		clearBtn.addEventListener('click', ()=>{ form.reset(); formError.textContent = ''; });
+
+		function renderTable(){
+			try{
+				const grade = gradeFilter.value || 'ALL';
+				const minAvg = Number(minAverage.value) || 0;
+
+				const filtered = students.filter(s => {
+					const gradeMatch = grade === 'ALL' ? true : (s.grade === grade);
+					const avgMatch = s.average >= minAvg;
+					return gradeMatch && avgMatch;
+				});
+
+				const rows = filtered.map(s => {
+					return `\n            <tr data-id="${s.id}">\n              <td>${escapeHtml(s.name)}</td>\n              <td>${s.math}</td>\n              <td>${s.science}</td>\n              <td>${s.english}</td>\n              <td>${s.history}</td>\n              <td>${s.total}</td>\n              <td>${s.average}</td>\n              <td>${s.grade}</td>\n              <td><button data-action="delete" data-id="${s.id}" class="secondary">Delete</button></td>\n            </tr>`;
+				}).join('');
+
+				tbody.innerHTML = rows || '<tr><td colspan="9" class="muted">No students to display</td></tr>';
+
+				tbody.querySelectorAll('button[data-action="delete"]').forEach(btn=>{
+					btn.addEventListener('click', (e)=>{
+						const id = Number(e.currentTarget.dataset.id);
+						deleteStudent(id);
+					});
+				});
+			}catch(err){
+				console.error('Failed to render table', err);
+			}
+		}
+
+		function deleteStudent(id){
+			try{
+				students = students.filter(s => s.id !== id);
+				saveStudents();
+				renderTable();
+				updateSummary();
+			}catch(err){
+				console.error('Delete failed', err);
+			}
+		}
+
+		applyFilter.addEventListener('click', ()=>{ renderTable(); updateSummary(); });
+		resetFilter.addEventListener('click', ()=>{ gradeFilter.value='ALL'; minAverage.value=''; renderTable(); updateSummary(); });
+
+		clearAllBtn.addEventListener('click', ()=>{
+			if(!confirm('Clear all students? This cannot be undone.')) return;
+			students = [];
+			saveStudents();
+			renderTable();
+			updateSummary();
+		});
+
+		exportJsonBtn.addEventListener('click', ()=>{
+			try{
+				const dataStr = JSON.stringify(students, null, 2);
+				const blob = new Blob([dataStr], {type:'application/json'});
+				const url = URL.createObjectURL(blob);
+				const a = document.createElement('a');
+				a.href = url;
+				a.download = 'students_export.json';
+				document.body.appendChild(a);
+				a.click();
+				a.remove();
+				URL.revokeObjectURL(url);
+			}catch(err){
+				console.error('Export failed', err);
+			}
+		});
+
+		function updateSummary(){
+			try{
+				const totalStudents = students.length;
+
+				const classAverage = totalStudents === 0 ? 0 : parseFloat((students.reduce((acc,s)=>acc + s.average, 0) / totalStudents).toFixed(2));
+
+				const allScores = students.map(s => [s.math, s.science, s.english, s.history]).flat();
+
+				const highest = allScores.length ? allScores.reduce((max,cur)=>cur>max?cur:max, allScores[0]) : 0;
+				const lowest = allScores.length ? allScores.reduce((min,cur)=>cur<min?cur:min, allScores[0]) : 0;
+
+				totalStudentsNode.textContent = totalStudents;
+				classAverageNode.textContent = classAverage;
+				highestScoreNode.textContent = highest;
+				lowestScoreNode.textContent = lowest;
+			}catch(err){
+				console.error('Failed to update summary', err);
+			}
+		}
+
+		function escapeHtml(unsafe){
+			return unsafe.replace(/[&<>"']/g, function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#039;"}[m];});
+		}
+
+		window._students = students;
+		window.findStudentByName = name => students.find(s => s.name.toLowerCase() === name.toLowerCase());
+
+		updateSummary();
+
+		function getAllNames(){ return students.map(s=>s.name); }
+	</script>
+</body>
+</html>
+
